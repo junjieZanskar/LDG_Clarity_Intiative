@@ -6,7 +6,8 @@
 **Answer:**
 [Latest Update Document](https://docs.google.com/document/d/1Dj4S8lhh6gbPJRFLeR2p_CRws_2S2Tym/edit)
 
-The version number is **LDG-ver5-L90**, a `.DAT` file is available.
+The version number is **LDG-ver5-L90**, a `.DAT` file is available. 
+https://drive.google.com/file/d/1xZpEdeee5hrr0ag-9YBIXtf2p3nvYlRd/view?usp=sharing
 
 Inside the `.DAT` file, it has a version history with a description of changes.
 
@@ -72,5 +73,33 @@ Inside the `.DAT` file, it has a version history with a description of changes.
 | ver5-K84     | Injection same as K83, put 3218 fault |
 | ver5-L90     | Fix I177, inject temp down 10C after 1/2020, seasonal injection 70C/80C instead of 90C |
 
-**Comment:** It looks like the postfix is incremented. I searched for `.sim` files under the whole Model folder, and the latest one I found is `LDG-ver5-M92.sim`.
+## Comments and Observations
+
+1. The version history shows numerous manual changes, such as multiplying permeability by 10 and altering injection temperatures.
+2. It appears that the postfix is incremented. I searched for `.sim` files throughout the entire Model folder, and the latest one I found is `LDG-ver5-M92.sim`.
+
+## Question 2:
+**How is the fracture represented in their TETRAD Model? Can we export the fracture model?**
+
+**Note:** I have crashing issue when exporting `frac.perm`.
+
+We may not necessarily need PetraSim, as it is primarily a post-processor/visualizer. All necessary data is available.
+
+**TODO:**
+
+## Question 3:
+**What are the initial conditions and natural state of their model?**
+
+**TODO:**
+
+## Question 4:
+**Why did they choose the Dual Porosity Model? Is our workflow capable of implementing it?**
+
+**TODO:**
+
+## Question 5:
+**Can we run the model, and is there a free version of TETRAD software available?**
+
+**TODO:**
+
 
