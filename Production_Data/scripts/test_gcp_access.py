@@ -33,7 +33,7 @@ def test_bucket_access(bucket_name: str):
 
 if __name__ == "__main__":
     # Replace with your bucket name
-    BUCKET_NAME = "your-bucket-name"
+    BUCKET_NAME = "comsol_ldg"
     
     print("Testing GCP bucket access...")
     test_bucket_access(BUCKET_NAME) 

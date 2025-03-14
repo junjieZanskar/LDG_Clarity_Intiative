@@ -27,13 +27,13 @@ def ensure_directory(directory: str):
     if not os.path.exists(directory):
         os.makedirs(directory)
 
-def download_from_gcp(bucket_name: str, source_blob_prefix: str, destination_folder: str) -> List[str]:
+def download_from_gcp(bucket_name: str, file_names: List[str], destination_folder: str) -> List[str]:
     """
-    Download files from GCP bucket to local folder.
+    Download specific files from GCP bucket to local folder.
     
     Args:
         bucket_name: Name of the GCP bucket
-        source_blob_prefix: Prefix to filter blobs in the bucket
+        file_names: List of file names to download from the bucket
         destination_folder: Local folder to save downloaded files
         
     Returns:
@@ -49,19 +49,21 @@ def download_from_gcp(bucket_name: str, source_blob_prefix: str, destination_fol
         
         downloaded_files = []
         
-        # List all blobs with the given prefix
-        blobs = bucket.list_blobs(prefix=source_blob_prefix)
+        # Download each specified file
+        for file_name in file_names:
+            blob = bucket.blob(file_name)
+            destination_file = os.path.join(destination_folder, os.path.basename(file_name))
+            
+            try:
+                blob.download_to_filename(destination_file)
+                print(f"Downloaded: {file_name} to {destination_file}")
+                downloaded_files.append(destination_file)
+            except Exception as e:
+                print(f"Error downloading {file_name}: {str(e)}")
         
-        for blob in blobs:
-            # Skip if it's a directory
-            if blob.name.endswith('/'):
-                continue
-                
-            destination_file = os.path.join(destination_folder, os.path.basename(blob.name))
-            blob.download_to_filename(destination_file)
-            print(f"Downloaded: {blob.name} to {destination_file}")
-            downloaded_files.append(destination_file)
-        
+        if not downloaded_files:
+            raise Exception("No files were downloaded successfully")
+            
         return downloaded_files
         
     except Exception as e:
@@ -79,7 +81,7 @@ def combine_csv_files(file_paths: List[str], output_path: str):
     """
     # Read and combine all CSV files
     dataframes = []
-    for file_path in file_paths:
+    for file_path in file_paths[:2]:
         df = pd.read_csv(file_path)
         dataframes.append(df)
     
@@ -93,20 +95,40 @@ def combine_csv_files(file_paths: List[str], output_path: str):
 def main():
     # Get the script's directory
     script_dir = os.path.dirname(os.path.abspath(__file__))
+    parent_dir = os.path.dirname(script_dir)
     
     # Set up GCP credentials
-    set_gcp_credentials()
+    # set_gcp_credentials()
     
     # Configuration
-    BUCKET_NAME = "your-bucket-name"  # Replace with your bucket name
-    SOURCE_PREFIX = "your/prefix/"    # Replace with your prefix
-    RAW_DATA_FOLDER = os.path.join(script_dir, "RawData")
-    MASTERSHEET_PATH = os.path.join(script_dir, "mastersheet.csv")
+    BUCKET_NAME = "comsol_ldg"  # Replace with your bucket name
+    prefix = 'Eagle_Vision_Working_Data_Warehouse/'  # Added trailing slash for path joining
+
+    base_files = [
+        "13-7.json",
+        "17-7.json",
+        "32-18.json",
+        "45-7.json",
+        "45A-7.json",
+        "53-7ST.json",
+        "55-7.json",
+        "63-7.json",
+        "66-7.json",
+        "66A-7.json",
+        "75-7.json",
+        "76-7.json"
+    ]
+
+    # Create full file paths by joining prefix with each file name
+    FILE_NAMES = [prefix + file_name for file_name in base_files]
+        
+    RAW_DATA_FOLDER = os.path.join(parent_dir, "RawData")
+    MASTERSHEET_PATH = os.path.join(parent_dir, "CleanData/Production.csv")
     
     # Download files from GCP
     downloaded_files = download_from_gcp(
         bucket_name=BUCKET_NAME,
-        source_blob_prefix=SOURCE_PREFIX,
+        file_names=FILE_NAMES,
         destination_folder=RAW_DATA_FOLDER
     )
     
