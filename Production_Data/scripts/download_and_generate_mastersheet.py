@@ -71,26 +71,119 @@ def download_from_gcp(bucket_name: str, file_names: List[str], destination_folde
         print("Please verify your credentials and bucket configuration.")
         raise
 
-def combine_csv_files(file_paths: List[str], output_path: str):
+def process_json(file_path: str) -> pd.DataFrame:
     """
-    Combine multiple CSV files into a single mastersheet.
+    Process a single JSON file and return a properly formatted DataFrame.
+    The DataFrame will be indexed by Date and sorted chronologically from past to present.
+    Only includes Flow, Press, and Temp columns with their respective units.
     
     Args:
-        file_paths: List of CSV file paths to combine
-        output_path: Path where the combined CSV will be saved
+        file_path: Path to the JSON file
+        
+    Returns:
+        pd.DataFrame: Processed DataFrame with Date index and filtered columns
     """
-    # Read and combine all CSV files
-    dataframes = []
-    for file_path in file_paths[:2]:
-        df = pd.read_csv(file_path)
-        dataframes.append(df)
+    # Read JSON file
+    with open(file_path, 'r') as f:
+        import json
+        json_data = json.load(f)
     
-    # Concatenate all dataframes
-    combined_df = pd.concat(dataframes, ignore_index=True)
+    # Convert to DataFrame
+    df = pd.DataFrame(json_data)
     
-    # Save the combined dataframe
-    combined_df.to_csv(output_path, index=False)
-    print(f"Created mastersheet: {output_path}")
+    # Ensure Date column exists
+    if 'Date' not in df.columns:
+        raise ValueError(f"No 'Date' column found in {file_path}")
+    
+    # Filter columns that contain Flow, Press, or Temp
+    columns_to_keep = []
+    for col in df.columns:
+        if any(keyword in col for keyword in ['Flow', 'Press', 'Temp']):
+            columns_to_keep.append(col)
+    
+    # Keep only the filtered columns plus Date
+    df = df[['Date'] + columns_to_keep]
+    
+    # Rename columns to include units
+    column_mapping = {}
+    for col in columns_to_keep:
+        if 'Flow' in col:
+            column_mapping[col] = f"{col} (gpm)"
+        elif 'Press' in col:
+            column_mapping[col] = f"{col} (psi)"
+        elif 'Temp' in col:
+            column_mapping[col] = f"{col} (F)"
+    
+    df = df.rename(columns=column_mapping)
+    
+    # Convert Date to datetime and set as index
+    df['Date'] = pd.to_datetime(df['Date'])
+    
+    # Keep only the date part (YYYY-MM-DD) and format as string
+    df['Date'] = df['Date'].dt.date.astype(str)
+    df.set_index('Date', inplace=True)
+    
+    # Sort index chronologically (oldest to newest)
+    df.sort_index(inplace=True)
+    
+    return df
+
+def combine_json_files(file_paths: List[str], output_path: str):
+    """
+    Process multiple JSON files into separate sheets in an Excel file.
+    Each JSON file will be transformed into a DataFrame with its own sheet.
+    Each sheet will have Date as index, sorted chronologically.
+    
+    Args:
+        file_paths: List of JSON file paths to combine
+        output_path: Path where the Excel file will be saved
+    """
+    # Change output extension to xlsx
+    output_path = output_path.replace('.csv', '.xlsx')
+    
+    # Create Excel writer object
+    with pd.ExcelWriter(output_path, engine='openpyxl', datetime_format='yyyy-mm-dd') as writer:
+        for file_path in file_paths:
+            try:
+                # Get well name from file name (remove .json extension)
+                well_name = os.path.basename(file_path).replace('.json', '')
+                
+                # Process JSON file into DataFrame
+                df = process_json(file_path)
+                
+                # Write to Excel with datetime formatting
+                df.to_excel(writer, sheet_name=well_name)
+                
+                # Get the worksheet
+                worksheet = writer.sheets[well_name]
+                
+                # Set column widths and format
+                # First column (A) is the index (Date)
+                worksheet.column_dimensions['A'].width = 12  # Date column width (shorter now)
+                
+                # Format other columns
+                for idx, col in enumerate(df.columns, start=1):  # Start from B column
+                    col_letter = chr(65 + idx)  # B, C, D, etc.
+                    
+                    # Calculate max width needed
+                    max_length = max(
+                        df[col].astype(str).apply(len).max(),
+                        len(col)
+                    )
+                    worksheet.column_dimensions[col_letter].width = max_length + 2
+                    
+                    # Format numeric columns
+                    if df[col].dtype in ['float64', 'int64']:
+                        for cell in worksheet[col_letter][1:]:
+                            cell.number_format = '0.00'
+                
+                print(f"Processed {well_name} data with columns: {', '.join(df.columns)}")
+                
+            except Exception as e:
+                print(f"Error processing {file_path}: {str(e)}")
+                continue
+    
+    print(f"\nCreated Excel workbook with multiple sheets at: {output_path}")
 
 def main():
     # Get the script's directory
@@ -123,7 +216,10 @@ def main():
     FILE_NAMES = [prefix + file_name for file_name in base_files]
         
     RAW_DATA_FOLDER = os.path.join(parent_dir, "RawData")
-    MASTERSHEET_PATH = os.path.join(parent_dir, "CleanData/Production.csv")
+    MASTERSHEET_PATH = os.path.join(parent_dir, "CleanData/Production.xlsx")  # Changed to xlsx
+    
+    # Ensure CleanData directory exists
+    ensure_directory(os.path.dirname(MASTERSHEET_PATH))
     
     # Download files from GCP
     downloaded_files = download_from_gcp(
@@ -132,8 +228,8 @@ def main():
         destination_folder=RAW_DATA_FOLDER
     )
     
-    # Combine files into mastersheet
-    combine_csv_files(
+    # Combine files into Excel workbook with multiple sheets
+    combine_json_files(
         file_paths=downloaded_files,
         output_path=MASTERSHEET_PATH
     )
